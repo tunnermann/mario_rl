@@ -33,7 +33,7 @@ else:
 env = JoypadSpace(env, [["right"], ["right", "A"]])
 
 env.reset()
-next_state, reward, done, trunc, info = env.onstep(action=0)
+next_state, reward, done, trunc, info = env.step(action=0)
 print(f"{next_state.shape},\n {reward},\n {done},\n {info}")
 
 """Preprocess Environment
