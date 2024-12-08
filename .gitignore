@@ -1,7 +1,15 @@
 ppo_checkpoints/
 checkpoints/
 venv/
+venv2/
 *.pyc
 *.pyd
 *.pyo
 *.pyz
+failed
+__pycache__/
+videos/
+model/
+model_retangular/
+.python-version
+.DS_Store
