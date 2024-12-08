@@ -1,5 +1,7 @@
+gym==0.21.0
 gym-super-mario-bros==7.4.0
-tensordict==0.3.0
-torchrl==0.3.0
-torchvision
 matplotlib
+stable-baselines3==1.6.0
+tensorboard
+torch
+torchvision
