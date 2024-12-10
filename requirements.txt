@@ -5,3 +5,4 @@ stable-baselines3==1.6.0
 tensorboard
 torch
 torchvision
+opencv-python
