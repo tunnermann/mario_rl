@@ -11,12 +11,12 @@ from stable_baselines3 import A2C
 # Model Param
 CHECK_FREQ_NUMB = 10000
 TOTAL_TIMESTEP_NUMB = 6000000
-LEARNING_RATE = 0.0007 # A2C needs higher learning rate
-ENT_COEF = 0.02
-N_STEPS = 8 # Shorter rollouts for A2C
+LEARNING_RATE = 0.00005
+ENT_COEF = 0.01
+N_STEPS = 32
 GAMMA = 0.99
 
-VF_COEF = 0.5  # Value Function coefficient
+VF_COEF = 0.5 # Value Function coefficient
 RMS_PROP_EPS = 1e-5  # RMSprop epsilon
 MAX_GRAD_NORM = 0.5  # Maximum gradient norm
 
@@ -42,14 +42,14 @@ env = get_env(STAGE_NAME)
 env.reset()
 state, reward, done, info = env.step([0])
 
-policy_kwargs = dict(
-    features_extractor_class=MarioNet,
-    features_extractor_kwargs=dict(features_dim=512),
-    optimizer_class=torch.optim.RMSprop,
-    optimizer_kwargs=dict(eps=RMS_PROP_EPS, alpha=0.99, weight_decay=0.0),
-)
+# policy_kwargs = dict(
+#     features_extractor_class=MarioNet,
+#     features_extractor_kwargs=dict(features_dim=512),
+#     optimizer_class=torch.optim.RMSprop,
+#     optimizer_kwargs=dict(eps=RMS_PROP_EPS, alpha=0.99, weight_decay=0.0),
+# )
 
-save_dir = Path('./model_a2c')
+save_dir = Path('./model_a2c4')
 save_dir.mkdir(parents=True, exist_ok=True)
 reward_log_path = (save_dir / 'reward_log.csv')
 
@@ -59,7 +59,7 @@ with open(reward_log_path, 'a') as f:
 model = A2C('CnnPolicy', 
             env, 
             verbose=0, 
-            policy_kwargs=policy_kwargs,
+            # policy_kwargs=policy_kwargs,
             tensorboard_log=save_dir,
             learning_rate=linear_schedule(LEARNING_RATE),
             n_steps=N_STEPS, 

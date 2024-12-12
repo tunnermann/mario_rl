@@ -34,13 +34,13 @@ class TrainAndLoggingCallback(BaseCallback):
             model_path = f"{self.save_path}/best_model_{self.n_calls}.zip"
             self.model.save(model_path)
 
-            mean_reward = 0
-            n_episodes = 0
+            episode_rewards = []
+            best_reward = -float("inf")
 
             for _ in range(self.episode_numbers):
                 obs = self.env.reset()
                 total_time = [0] * self.env.num_envs
-                episode_rewards = [0] * self.env.num_envs
+                current_episode_rewards = [0] * self.env.num_envs
                 dones = [False] * self.env.num_envs
 
                 while not all(dones) and all(
@@ -52,26 +52,28 @@ class TrainAndLoggingCallback(BaseCallback):
                     for i in range(self.env.num_envs):
                         if not dones[i]:
                             total_time[i] += 1
-                            episode_rewards[i] += rewards[i]
+                            current_episode_rewards[i] += rewards[i]
                             dones[i] = new_dones[i]
 
-                mean_reward += sum(episode_rewards)
-                n_episodes += self.env.num_envs
+                episode_rewards.extend(current_episode_rewards)
+                current_best = max(current_episode_rewards)
+                if current_best > best_reward:
+                    best_reward = current_best
 
-            mean_reward = mean_reward / n_episodes
+            mean_reward = sum(episode_rewards) / len(episode_rewards)
 
-            if mean_reward > self.best_mean_reward:
-                self.best_mean_reward = mean_reward
+            if best_reward > self.best_mean_reward:
+                self.best_mean_reward = best_reward
                 self.model.save(f"{self.save_path}/best_model.zip")
 
             print(f"Num timesteps: {self.num_timesteps}")
-            print(f"Best mean reward: {self.best_mean_reward:.2f}")
+            print(f"Best reward: {self.best_mean_reward:.2f}")
             print(f"Last mean reward per episode: {mean_reward:.2f}")
 
             # Log the rewards
             with open(self.reward_log_path, "a") as f:
                 print(
-                    f"{self.num_timesteps},{mean_reward:.2f},{self.best_mean_reward:.2f}",
+                    f"{self.num_timesteps},{mean_reward:.2f},{best_reward:.2f}",
                     file=f,
                 )
 

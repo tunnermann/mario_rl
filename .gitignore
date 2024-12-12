@@ -11,6 +11,6 @@ __pycache__/
 videos/
 model/
 model_retangular/
-model_a2c/
+model_a2c*
 .python-version
 .DS_Store

@@ -11,7 +11,7 @@ def play(episodes=1):
     """
     When you want to watch Mario play
     """
-    STAGE_NAME = 'SuperMarioBros-1-1-v3'
+    STAGE_NAME = 'SuperMarioBros-1-2-v3'
     env = get_env(STAGE_NAME)
 
     env = gym.wrappers.RecordVideo(env, "videos", episode_trigger=lambda x: True)
@@ -24,7 +24,7 @@ def play(episodes=1):
     save_dir = Path('./model_retangular')
     model_path = save_dir / 'best_model_2000000.zip'
 
-    model = PPO.load(model_path, env=env, policy_kwargs=policy_kwargs)
+    model = PPO.load(model_path, env=env)
 
     for _ in range(episodes):
         current_state = env.reset()

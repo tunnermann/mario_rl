@@ -8,12 +8,12 @@ from stable_baselines3.common.sb2_compat.rmsprop_tf_like import RMSpropTFLike
 
 # Model Param
 CHECK_FREQ_NUMB = 10000
-TOTAL_TIMESTEP_NUMB = 6000000
 LEARNING_RATE = 0.0007
 ENT_COEF = 0.05
 N_STEPS = 128  # Shorter rollouts for A2C
 GAMMA = 0.99
-N_ENVS = 2  # Number of environments
+N_ENVS = 4  # Number of environments
+TOTAL_TIMESTEP_NUMB = 6000000 * N_ENVS
 
 VF_COEF = 0.5  # Value Function coefficient
 RMS_PROP_EPS = 1e-5  # RMSprop epsilon
@@ -49,7 +49,7 @@ def main():
     #     optimizer_kwargs=dict(eps=RMS_PROP_EPS, alpha=0.99, weight_decay=0.0),
     # )
 
-    save_dir = Path("./model_a2c")
+    save_dir = Path("./model_a2c2")
     save_dir.mkdir(parents=True, exist_ok=True)
     reward_log_path = save_dir / "reward_log.csv"
 
