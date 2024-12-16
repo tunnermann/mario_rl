@@ -17,15 +17,11 @@ from nes_py.wrappers import JoypadSpace
 import gym_super_mario_bros
 
 from tensordict import TensorDict
-from torchrl.data import TensorDictReplayBuffer, LazyMemmapStorage
+# from torchrl.data import TensorDictReplayBuffer, LazyMemmapStorage
 
 # Initialize Super Mario environment (in v0.26 change render mode to 'human' to see results on the screen)
-if gym.__version__ < "0.26":
-    env = gym_super_mario_bros.make("SuperMarioBros-1-1-v0", new_step_api=True)
-else:
-    env = gym_super_mario_bros.make(
-        "SuperMarioBros-1-1-v0", render_mode="rgb", apply_api_compatibility=True
-    )
+env = gym_super_mario_bros.make("SuperMarioBros-1-1-v0")
+
 
 # Limit the action-space to
 #   0. walk right
@@ -98,10 +94,8 @@ class GrayScaleObservation(gym.ObservationWrapper):
         return observation
 
     def observation(self, observation):
-        observation = self.permute_orientation(observation)
-        transform = T.Grayscale()
-        observation = transform(observation)
-        return observation
+        observation = np.transpose(observation, (2, 0, 1))
+        return T.Grayscale()(torch.tensor(observation, dtype=torch.float))
 
 
 class ResizeObservation(gym.ObservationWrapper):
@@ -190,33 +184,35 @@ class Mario:
 
     def act(self, state):
         """
-        Given a state, choose an epsilon-greedy action and update value of step.
+        Given a state, choose an epsilon-greedy action.
 
         Inputs:
         state(``LazyFrame``): A single observation of the current state, dimension is (state_dim)
         Outputs:
         ``action_idx`` (``int``): An integer representing which action Mario will perform
         """
-        # EXPLORE
-        if np.random.rand() < self.exploration_rate:
-            action_idx = np.random.randint(self.action_dim)
+        # Process state to tensor
+        state_array = state[0].__array__() if isinstance(state, tuple) else state.__array__()
+        state_tensor = torch.tensor(state_array, device=self.device).unsqueeze(0)
 
-        # EXPLOIT
+        # Decide between exploration and exploitation
+        if np.random.rand() < self.exploration_rate:
+            action_idx = np.random.randint(self.action_dim)  # Explore
         else:
-            state = (
-                state[0].__array__() if isinstance(state, tuple) else state.__array__()
-            )
-            state = torch.tensor(state, device=self.device).unsqueeze(0)
-            action_values = self.net(state, model="online")
+            action_values = self.net(state_tensor, model="online")  # Exploit
             action_idx = torch.argmax(action_values, axis=1).item()
 
-        # decrease exploration_rate
-        self.exploration_rate *= self.exploration_rate_decay
-        self.exploration_rate = max(self.exploration_rate_min, self.exploration_rate)
+        # Decay exploration rate
+        self.exploration_rate = max(
+            self.exploration_rate_min,
+            self.exploration_rate * self.exploration_rate_decay
+        )
 
-        # increment step
+        # Increment step counter
         self.curr_step += 1
+
         return action_idx
+
 
 
 """Cache and Recall
@@ -238,59 +234,59 @@ memory, and uses that to learn the game.
 class Mario(Mario):  # subclassing for continuity
     def __init__(self, state_dim, action_dim, save_dir):
         super().__init__(state_dim, action_dim, save_dir)
-        self.memory = TensorDictReplayBuffer(
-            storage=LazyMemmapStorage(40000, device=torch.device("cpu"))
-        )
+        self.memory = []
+        self.max_memory_size = 40000
         self.batch_size = 32
 
     def cache(self, state, next_state, action, reward, done):
         """
-        Store the experience to self.memory (replay buffer)
+        Store the experience in the replay buffer.
 
         Inputs:
-        state (``LazyFrame``),
-        next_state (``LazyFrame``),
-        action (``int``),
-        reward (``float``),
-        done(``bool``))
+        state (``LazyFrame``): Current state
+        next_state (``LazyFrame``): Next state
+        action (``int``): Action taken
+        reward (``float``): Reward received
+        done (``bool``): Whether the episode is finished
         """
+        # Convert inputs to tensors
+        def to_tensor(x):
+            x_array = x[0].__array__() if isinstance(x, tuple) else x.__array__()
+            return torch.tensor(x_array, dtype=torch.float)
 
-        def first_if_tuple(x):
-            return x[0] if isinstance(x, tuple) else x
+        state_tensor = to_tensor(state)
+        next_state_tensor = to_tensor(next_state)
+        action_tensor = torch.tensor([action], dtype=torch.long)
+        reward_tensor = torch.tensor([reward], dtype=torch.float)
+        done_tensor = torch.tensor([done], dtype=torch.bool)
 
-        state = first_if_tuple(state).__array__()
-        next_state = first_if_tuple(next_state).__array__()
-
-        state = torch.tensor(state)
-        next_state = torch.tensor(next_state)
-        action = torch.tensor([action])
-        reward = torch.tensor([reward])
-        done = torch.tensor([done])
-
-        # self.memory.append((state, next_state, action, reward, done,))
-        self.memory.add(
-            TensorDict(
-                {
-                    "state": state,
-                    "next_state": next_state,
-                    "action": action,
-                    "reward": reward,
-                    "done": done,
-                },
-                batch_size=[],
-            )
+        # Add to replay buffer as TensorDict
+        experience = TensorDict(
+            {
+                "state": state_tensor,
+                "next_state": next_state_tensor,
+                "action": action_tensor,
+                "reward": reward_tensor,
+                "done": done_tensor,
+            },
+            batch_size=[],
         )
+        self.memory.add(experience)
+
 
     def recall(self):
         """
         Retrieve a batch of experiences from memory
         """
-        batch = self.memory.sample(self.batch_size).to(self.device)
-        state, next_state, action, reward, done = (
-            batch.get(key)
-            for key in ("state", "next_state", "action", "reward", "done")
+        batch = random.sample(self.memory, self.batch_size)
+        state, next_state, action, reward, done = zip(*batch)
+        return (
+            torch.stack(state).to(self.device),
+            torch.stack(next_state).to(self.device),
+            torch.tensor(action).to(self.device),
+            torch.tensor(reward).to(self.device),
+            torch.tensor(done).to(self.device),
         )
-        return state, next_state, action.squeeze(), reward.squeeze(), done.squeeze()
 
 
 """Learn
@@ -342,18 +338,26 @@ class MarioNet(nn.Module):
             return self.target(input)
 
     def __build_cnn(self, c, output_dim):
-        return nn.Sequential(
-            nn.Conv2d(in_channels=c, out_channels=32, kernel_size=8, stride=4),
+        conv_layers = nn.Sequential(
+            nn.Conv2d(c, 32, kernel_size=8, stride=4),
             nn.ReLU(),
-            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2),
             nn.ReLU(),
-            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1),
             nn.ReLU(),
-            nn.Flatten(),
-            nn.Linear(3136, 512),
+        )
+        flat_size = self._get_flat_size(conv_layers, (c, 84, 84))
+        fc_layers = nn.Sequential(
+            nn.Linear(flat_size, 512),
             nn.ReLU(),
             nn.Linear(512, output_dim),
         )
+        return nn.Sequential(conv_layers, nn.Flatten(), fc_layers)
+    
+    def _get_flat_size(self, conv, shape):
+        x = torch.zeros(1, *shape)
+        x = conv(x)
+        return int(np.prod(x.size()))
 
 
 """TD Estimate & TD Target
