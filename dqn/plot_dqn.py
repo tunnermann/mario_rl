@@ -28,7 +28,7 @@ def plot_metrics(csv_file, output_dir):
     plt.close()
 
 if __name__ == "__main__":
-    csv_file = "metrics/dqn_metrics.csv"
+    csv_file = "dqn/metrics/dqn_metrics.csv"
     output_dir = "plots"
     plot_metrics(csv_file, output_dir)
     print(f"Gráficos salvos em {output_dir}")
